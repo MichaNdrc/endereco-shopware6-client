@@ -6,6 +6,7 @@ namespace Endereco\Shopware6Client\Service;
 
 use Endereco\Shopware6Client\DTO\CustomerAddressDTO;
 use Endereco\Shopware6Client\Entity\CustomerAddress\CustomerAddressExtension;
+use Endereco\Shopware6Client\Entity\EnderecoAddressExtension\EnderecoBaseAddressExtensionEntity;
 use Endereco\Shopware6Client\Entity\EnderecoAddressExtension\CustomerAddress\EnderecoCustomerAddressExtensionEntity;
 use Endereco\Shopware6Client\Entity\EnderecoAddressExtension\OrderAddress\EnderecoOrderAddressExtensionEntity;
 use Endereco\Shopware6Client\Entity\OrderAddress\OrderAddressExtension;
@@ -436,6 +437,14 @@ class EnderecoService
         $isFullStreetEmpty = empty($addressData['street']);
         $isStreetNameEmpty = empty($addressData['extensions'][$extensionName]['street']);
 
+        // If the user explicitly confirmed the original address, do not overwrite additionalAddressLine
+        // with data from the splitStreet API (e.g. "Nr." being extracted as additionalInfo).
+        $amsStatus = $addressData['extensions'][$extensionName]['amsStatus'] ?? '';
+        $isAddressSelectedByCustomer = str_contains(
+            $amsStatus,
+            EnderecoBaseAddressExtensionEntity::AMS_STATUS_SELECTED_BY_CUSTOMER
+        );
+
         // Create payload objects for normalized updates
         $customerAddressPayload = new CustomerAddressUpdatePayload('sync_street');
         $extensionData = new EnderecoExtensionData();
@@ -497,9 +506,13 @@ class EnderecoService
             );
 
             // Set split results in payload objects
-            $customerAddressPayload->setStreet($streetSplitResult->getFullStreet());
+            $customerAddressPayload->setStreet(
+                // When the user confirmed the address, keep the original street value
+                // to prevent the API from stripping parts like "Nr." into additionalInfo.
+                $isAddressSelectedByCustomer ? $fullStreet : $streetSplitResult->getFullStreet()
+            );
 
-            if ($streetSplitResult->getAdditionalInfo() !== null) {
+            if ($streetSplitResult->getAdditionalInfo() !== null && !$isAddressSelectedByCustomer) {
                 if (array_key_exists('additionalAddressLine1', $addressData)) {
                     $customerAddressPayload->setAdditionalAddressLine1($streetSplitResult->getAdditionalInfo());
                 } elseif (array_key_exists('additionalAddressLine2', $addressData)) {
@@ -566,9 +579,13 @@ class EnderecoService
                 );
 
                 // Set split results in payload objects
-                $customerAddressPayload->setStreet($splitStreetResult->getFullStreet());
+                $customerAddressPayload->setStreet(
+                    // When the user confirmed the address, keep the original street value
+                    // to prevent the API from stripping parts like "Nr." into additionalInfo.
+                    $isAddressSelectedByCustomer ? $fullStreet : $splitStreetResult->getFullStreet()
+                );
 
-                if ($splitStreetResult->getAdditionalInfo() !== null) {
+                if ($splitStreetResult->getAdditionalInfo() !== null && !$isAddressSelectedByCustomer) {
                     if (array_key_exists('additionalAddressLine1', $addressData)) {
                         $customerAddressPayload->setAdditionalAddressLine1($splitStreetResult->getAdditionalInfo());
                     } elseif (array_key_exists('additionalAddressLine2', $addressData)) {
