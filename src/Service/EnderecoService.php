@@ -505,14 +505,20 @@ class EnderecoService
                 $salesChannelId
             );
 
-            // Set split results in payload objects
-            $customerAddressPayload->setStreet(
-                // When the user confirmed the address, keep the original street value
-                // to prevent the API from stripping parts like "Nr." into additionalInfo.
-                $isAddressSelectedByCustomer ? $fullStreet : $streetSplitResult->getFullStreet()
-            );
+            // If the user confirmed the address, only populate extension fields
+            // and skip overwriting street/additionalAddressLine to prevent the API
+            // from stripping parts like "Nr." into additionalInfo.
+            if ($isAddressSelectedByCustomer) {
+                $extensionData->setStreet($streetSplitResult->getStreetName());
+                $extensionData->setHouseNumber($streetSplitResult->getBuildingNumber());
+                $this->extensionArrayUpdater->updateFromExtensionPayload($extensionData, $addressData);
+                return;
+            }
 
-            if ($streetSplitResult->getAdditionalInfo() !== null && !$isAddressSelectedByCustomer) {
+            // Set split results in payload objects
+            $customerAddressPayload->setStreet($streetSplitResult->getFullStreet());
+
+            if ($streetSplitResult->getAdditionalInfo() !== null) {
                 if (array_key_exists('additionalAddressLine1', $addressData)) {
                     $customerAddressPayload->setAdditionalAddressLine1($streetSplitResult->getAdditionalInfo());
                 } elseif (array_key_exists('additionalAddressLine2', $addressData)) {
@@ -578,14 +584,20 @@ class EnderecoService
                     $salesChannelId
                 );
 
-                // Set split results in payload objects
-                $customerAddressPayload->setStreet(
-                    // When the user confirmed the address, keep the original street value
-                    // to prevent the API from stripping parts like "Nr." into additionalInfo.
-                    $isAddressSelectedByCustomer ? $fullStreet : $splitStreetResult->getFullStreet()
-                );
+                // If the user confirmed the address, only populate extension fields
+                // and skip overwriting street/additionalAddressLine to prevent the API
+                // from stripping parts like "Nr." into additionalInfo.
+                if ($isAddressSelectedByCustomer) {
+                    $extensionData->setStreet($splitStreetResult->getStreetName());
+                    $extensionData->setHouseNumber($splitStreetResult->getBuildingNumber());
+                    $this->extensionArrayUpdater->updateFromExtensionPayload($extensionData, $addressData);
+                    return;
+                }
 
-                if ($splitStreetResult->getAdditionalInfo() !== null && !$isAddressSelectedByCustomer) {
+                // Set split results in payload objects
+                $customerAddressPayload->setStreet($splitStreetResult->getFullStreet());
+
+                if ($splitStreetResult->getAdditionalInfo() !== null) {
                     if (array_key_exists('additionalAddressLine1', $addressData)) {
                         $customerAddressPayload->setAdditionalAddressLine1($splitStreetResult->getAdditionalInfo());
                     } elseif (array_key_exists('additionalAddressLine2', $addressData)) {

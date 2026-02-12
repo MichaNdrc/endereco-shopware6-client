@@ -93,6 +93,14 @@ final class StreetIsSplitInsurance implements IntegrityInsurance
             throw new \RuntimeException('The address extension should be set at this point');
         }
 
+        // If the user explicitly confirmed the original address, skip street splitting entirely
+        // to prevent the API from overwriting street/additionalAddressLine
+        // (e.g. "Nr." being extracted as additionalInfo).
+        $amsStatus = $addressExtension->getAmsStatus() ?? '';
+        if (str_contains($amsStatus, EnderecoBaseAddressExtensionEntity::AMS_STATUS_SELECTED_BY_CUSTOMER)) {
+            return;
+        }
+
         list($countryCode, $fullStreet, $additionalInfo) = $this->getRelevantData($addressEntity, $context);
 
         if (empty($fullStreet)) {
@@ -108,15 +116,6 @@ final class StreetIsSplitInsurance implements IntegrityInsurance
             $this->enderecoService->fetchSalesChannelId($context)
         );
 
-        // If the user explicitly confirmed the original address, keep the original street value
-        // and do not overwrite additionalAddressLine with data from the splitStreet API
-        // (e.g. "Nr." being extracted as additionalInfo).
-        $amsStatus = $addressExtension->getAmsStatus() ?? '';
-        $isAddressSelectedByCustomer = str_contains(
-            $amsStatus,
-            EnderecoBaseAddressExtensionEntity::AMS_STATUS_SELECTED_BY_CUSTOMER
-        );
-
         $addressDTO = new CustomerAddressDTO(
             $addressEntity,
             $addressExtension
@@ -128,8 +127,8 @@ final class StreetIsSplitInsurance implements IntegrityInsurance
         );
 
         $addressPersistenceStrategy->execute(
-            $isAddressSelectedByCustomer ? $fullStreet : $streetSplitResult->getFullStreet(),
-            $isAddressSelectedByCustomer ? $additionalInfo : $streetSplitResult->getAdditionalInfo(),
+            $streetSplitResult->getFullStreet(),
+            $streetSplitResult->getAdditionalInfo(),
             $streetSplitResult->getStreetName(),
             $streetSplitResult->getBuildingNumber(),
             $addressDTO
